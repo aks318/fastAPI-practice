@@ -1,0 +1,49 @@
+from fastapi import APIRouter, Depends, status, HTTPException
+from sqlalchemy.orm import Session
+from database import engine, get_db
+from model import Base, conversation, message
+from schema import messageCreate
+
+router = APIRouter()
+
+# Create Table
+Base.metadata.create_all(bind = engine)
+
+
+@router.get("/getNewChat")
+async def newChat(db: Session = Depends(get_db)):
+    new_convo = conversation(title="new chat")
+
+    db.add(new_convo)
+    db.commit()
+    db.refresh(new_convo)
+
+    return new_convo
+
+    
+
+@router.get("/loadChat/{id}")
+async def loadChat(id, db: Session = Depends(get_db)):
+    load_chat = db.get(conversation, id)
+    if not load_chat:
+        raise HTTPException(
+            status_code=404,
+            detail="Conversion not found"
+        )
+    return load_chat
+
+@router.get('/loadAllChat')
+async def loadAllChat(db: Session = Depends(get_db)):
+    load_all_chat = db.query(conversation).all()
+    return load_all_chat
+
+
+@router.post("/sendchat")
+async def sendchat(req: messageCreate, db: Session = Depends(get_db)):
+    data = message(
+        conversation_id= req.conversation_id,
+        user_role= "user",
+        context= req.context
+    )
+    db.add(data)
+    return "Success"
