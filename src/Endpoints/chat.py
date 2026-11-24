@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, status, HTTPException
+from langchain.messages import AIMessage, HumanMessage
 from sqlalchemy.orm import Session
 from database import engine, get_db
 from model import Base, conversation, message
 from schema import messageCreate
-
+from AI import workflow
 router = APIRouter()
 
 # Create Table
@@ -40,10 +41,37 @@ async def loadAllChat(db: Session = Depends(get_db)):
 
 @router.post("/sendchat")
 async def sendchat(req: messageCreate, db: Session = Depends(get_db)):
-    data = message(
+    history = db.query(message).filter(
+        message.conversation_id == req.conversation_id
+    ).order_by(message.id.asc()).all()
+
+    messageArr = []
+
+    for msg in history:
+        if msg.user_role == "user":
+            messageArr.append(HumanMessage(content=msg.context))
+        elif msg.user_role == "assistant":
+            messageArr.append(AIMessage(content=msg.context))
+
+    messageArr.append(HumanMessage(content=req.context))
+
+    result = await workflow.ainvoke({"messages": messageArr})
+
+    ai_response = result["messages"][-1].content
+
+    print(ai_response)
+
+    db.add(message(
         conversation_id= req.conversation_id,
         user_role= "user",
         context= req.context
-    )
-    db.add(data)
-    return "Success"
+    ))
+
+    db.add(message(
+        conversation_id= req.conversation_id,
+        user_role= "assistant",
+        context= ai_response
+    ))
+
+    db.commit()
+    return ai_response
