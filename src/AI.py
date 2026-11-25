@@ -1,6 +1,9 @@
 from langchain_ollama import ChatOllama
 from langgraph.graph import StateGraph, START, END, MessagesState
 from pydantic import BaseModel
+from langgraph.checkpoint.postgres import PostgresSaver
+
+DB_URI = "postgresql://aakash:Aakash@123@localhost:5432/chatbot"
 
 
 
@@ -13,7 +16,7 @@ def generateRes(state: MessagesState):
         "messages": [response]
     }
 
-def getWorkflow():
+def getWorkflow(checkpointer):
     graph = StateGraph(MessagesState)
 
     graph.add_node("generateRes", generateRes)
@@ -21,7 +24,5 @@ def getWorkflow():
     graph.add_edge(START, "generateRes")
     graph.add_edge("generateRes", END)
 
-    return graph.compile()
+    return graph.compile(checkpointer=checkpointer)
 
-
-workflow = getWorkflow()
